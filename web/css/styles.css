@@ -1091,12 +1091,22 @@ button.blue:hover { background: rgba(87,169,255,.2); border-color: var(--blue); 
 /* ================================================
    TABLES
    ================================================ */
+/* Контейнеры, в которые app.js вставляет таблицы.
+   .table-host стоит на <div> в index.html, .table-wrap — исторический алиас. */
+.table-host,
 .table-wrap {
   overflow: auto;
   max-height: 68vh;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--bg-deep);
+}
+
+/* Пустое состояние приходит в тот же контейнер — рамку рисует сам .empty */
+.table-host:has(> .empty) {
+  border: none;
+  background: none;
+  overflow: visible;
 }
 
 table {
