@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
+  <title>WB Supply Planner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=IBM+Plex+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+  <section id="auth-gate" class="auth-gate">
+    <div class="auth-card">
+      <h2>Вход в WB Supply Planner</h2>
+      <p>Авторизация нужна для доступа к данным и расчетам.</p>
+      <div class="auth-tabs">
+        <button id="auth-tab-login" class="auth-tab active" type="button">Вход</button>
+        <button id="auth-tab-register" class="auth-tab" type="button">Регистрация</button>
+      </div>
+
+      <form id="login-form" class="auth-form">
+        <label>Логин
+          <input id="login-username" type="text" required minlength="3" autocomplete="username">
+        </label>
+        <label>Пароль
+          <input id="login-password" type="password" required minlength="6" autocomplete="current-password">
+        </label>
+        <button class="primary" type="submit">Войти</button>
+      </form>
+
+      <form id="register-form" class="auth-form hidden">
+        <label>Логин
+          <input id="register-username" type="text" required minlength="3" autocomplete="username">
+        </label>
+        <label>Пароль
+          <input id="register-password" type="password" required minlength="6" autocomplete="new-password">
+        </label>
+        <label>Повторите пароль
+          <input id="register-password-repeat" type="password" required minlength="6" autocomplete="new-password">
+        </label>
+        <button class="primary" type="submit">Создать аккаунт</button>
+      </form>
+      <div id="auth-message" class="auth-message"></div>
+    </div>
+  </section>
+
+  <div id="app-shell" class="hidden">
+  <header class="topbar">
+    <div class="brand-wrap">
+      <div class="brand-dot"></div>
+      <div>
+        <div class="brand">WB Supply Planner</div>
+        <div class="brand-sub">Планирование поставок Wildberries</div>
+      </div>
+    </div>
+    <nav class="top-nav">
+      <div class="cabinet-switcher" id="cabinet-switcher-wrap">
+        <button id="cabinet-switcher-btn" class="ghost" type="button">Кабинет</button>
+        <div id="cabinet-switcher-menu" class="cabinet-switcher-menu hidden">
+          <div id="cabinet-switcher-list" class="cabinet-switcher-list"></div>
+          <button id="cabinet-add-btn" class="ghost" type="button">+ Добавить кабинет</button>
+        </div>
+      </div>
+      <a href="#" id="nav-dashboard-btn">Дашборд</a>
+      <div class="nav-dropdown">
+        <a href="#" id="nav-analytics-btn">Аналитика</a>
+        <div class="nav-dropdown-menu">
+          <button id="nav-analytics-stock-btn" type="button">Аналитика остатков</button>
+          <button id="nav-analytics-warehouse-btn" type="button">Аналитика складов</button>
+          <button id="nav-analytics-turnover-btn" type="button">Оборачиваемость</button>
+          <button id="nav-analytics-charts-btn" type="button">Графики</button>
+        </div>
+      </div>
+      <a href="#" id="nav-calc-btn">Расчет поставки</a>
+    </nav>
+    <button class="burger-btn" id="burger-btn" type="button" aria-label="Меню">
+      <span class="burger-icon"></span>
+    </button>
+    <div class="topbar-actions">
+      <div class="user-menu">
+        <button id="user-menu-btn" class="ghost current-user">Пользователь</button>
+        <div id="user-menu-dropdown" class="user-menu-dropdown hidden">
+          <button id="open-settings-btn" class="ghost menu-item">Настройки</button>
+          <button id="logout-btn" class="ghost menu-item">Выйти</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section id="page-dashboard" class="app-page">
+    <section class="hero panel">
+      <div class="hero-text">
+        <h1>Дашборд кабинета WB</h1>
+        <p>Общая аналитика по остаткам и заказам в кабинете. Источник данных: Wildberries API.</p>
+      </div>
+      <div class="hero-preview">
+        <canvas id="hero-mini-chart" width="420" height="180"></canvas>
+      </div>
+    </section>
+
+    <section class="kpi-grid">
+      <article class="kpi-card"><span>Текущий остаток</span><b id="kpi-stock">0</b><small>шт</small></article>
+      <article class="kpi-card"><span>Прогноз продаж 30д</span><b id="kpi-forecast">0</b><small>шт</small></article>
+      <article class="kpi-card"><span>Оборачиваемость кабинета</span><b id="kpi-turnover">—</b><small>дней</small></article>
+      <article class="kpi-card"><span>Процент выкупа</span><b id="kpi-buyout">—</b><small>%</small></article>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Маркеры покрытия</h2>
+        <div class="status-line">
+          <span id="status">API данные не загружены</span>
+          <span id="shipment-status">Источник: Wildberries API</span>
+        </div>
+      </div>
+      <div id="dashboard-markers" class="summary-cards"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Топ-15 товаров по заказам</h2>
+      </div>
+      <div id="dashboard-top-table"></div>
+      <div class="action-row">
+        <button id="go-calc-btn" class="primary">Рассчитать поставку</button>
+      </div>
+    </section>
+
+    <section class="panel chart-panel">
+      <div class="chart-head">
+        <h3>Заказы и остатки по кабинету за последний месяц</h3>
+        <div class="legend">
+          <span><i class="dot blue"></i> Остаток</span>
+          <span><i class="dot orange"></i> Заказы</span>
+        </div>
+      </div>
+      <canvas id="cabinet-month-chart" width="980" height="270"></canvas>
+    </section>
+    </section>
+
+    <section id="page-analytics" class="app-page hidden">
+    <section id="analytics-stock-section" class="panel">
+      <div class="panel-head">
+        <h2>Аналитика остатков</h2>
+      </div>
+      <div class="controls-grid">
+        <label class="field">
+          <span>Поиск</span>
+          <input id="analytics-search-input" type="text" placeholder="Артикул или наименование">
+        </label>
+        <label class="field">
+          <span>Категория</span>
+          <select id="analytics-category-filter">
+            <option value="__ALL__">Все категории</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Сортировка</span>
+          <select id="analytics-sort-select">
+            <option value="orders_desc">Заказы: больше к меньшему</option>
+            <option value="orders_asc">Заказы: меньше к большему</option>
+            <option value="coverage_asc">Покрытие: меньше к большему</option>
+            <option value="coverage_desc">Покрытие: больше к меньшему</option>
+          </select>
+        </label>
+      </div>
+      <div id="analytics-markers" class="summary-cards"></div>
+      <div id="analytics-report-table"></div>
+    </section>
+    <section id="analytics-warehouse-section" class="panel hidden">
+      <div class="panel-head">
+        <h2>Аналитика складов</h2>
+      </div>
+      <div class="controls-grid">
+        <label class="field">
+          <span>Поиск</span>
+          <input id="analytics-warehouse-search-input" type="text" placeholder="Склад...">
+        </label>
+        <label class="field">
+          <span>Сортировка</span>
+          <select id="analytics-warehouse-sort-select">
+            <option value="orders_desc">Заказы: больше к меньшему</option>
+            <option value="orders_asc">Заказы: меньше к большему</option>
+            <option value="coverage_asc">Покрытие: меньше к большему</option>
+            <option value="coverage_desc">Покрытие: больше к меньшему</option>
+            <option value="stock_desc">Остаток: больше к меньшему</option>
+          </select>
+        </label>
+      </div>
+      <div id="analytics-warehouse-table"></div>
+    </section>
+    <section id="analytics-turnover-section" class="panel hidden">
+      <div class="panel-head">
+        <h2>Оборачиваемость (14 дней)</h2>
+      </div>
+      <div id="analytics-turnover-table"></div>
+    </section>
+    <section id="analytics-charts-section" class="panel hidden">
+      <div class="panel-head">
+        <h2>Графики по артикулам</h2>
+      </div>
+      <div class="controls-grid">
+        <label class="field">
+          <span>Поиск артикула</span>
+          <input id="charts-search-input" type="text" placeholder="Артикул или наименование">
+        </label>
+      </div>
+      <div id="charts-sku-list" class="charts-sku-list"></div>
+      <div id="charts-canvas-wrap" class="charts-canvas-wrap">
+        <div class="charts-placeholder">Выберите товар из списка выше</div>
+      </div>
+    </section>
+    </section>
+
+    <section id="page-calc" class="app-page hidden">
+    <section class="main-grid" id="tools">
+      <div class="main-col">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Расчет поставки</h2>
+          </div>
+
+          <div class="controls-grid">
+            <label class="field">
+              <span>Поиск</span>
+              <input id="search-input" type="text" placeholder="Артикул или название">
+            </label>
+            <label class="field">
+              <span>Дата поставки</span>
+              <input id="delivery-date" type="date">
+            </label>
+            <label class="field">
+              <span>Метод</span>
+              <select id="calc-method">
+                <option value="ordered">По заказам</option>
+                <option value="bought">По выкупам</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Оборачиваемость (дни)</span>
+              <select id="turnover-days">
+                <option value="30">30</option>
+                <option value="45" selected>45</option>
+                <option value="60">60</option>
+                <option value="90">90</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Режим расчета</span>
+              <select id="calc-demand-mode">
+                <option value="demand">По потребности (факт)</option>
+                <option value="plan_max">По плану/факту (max)</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="toggles-row">
+            <label><input id="combine-msk" type="checkbox"> Объединить МСК</label>
+            <label><input id="exclude-msk" type="checkbox"> Исключить МСК</label>
+            <label><input id="enable-rounding" type="checkbox" checked> Округление</label>
+            <label><input id="hide-small-shipments" type="checkbox" checked> Скрыть поставки &lt; 5</label>
+            <label><input id="show-only-risk" type="checkbox"> Только риск OOS</label>
+            <label><input id="hide-overstock-turnover" type="checkbox"> Скрыть излишки (оборачиваемость &gt; 30 дн.)</label>
+          </div>
+          <div class="controls-grid" style="margin-top: 10px;">
+            <label class="field">
+              <span>Склады для расчета</span>
+              <div class="multi-dropdown" id="calc-warehouses-dropdown-wrap">
+                <button type="button" id="calc-warehouses-dropdown-btn" class="ghost dropdown-btn">Выберите склады</button>
+                <div id="calc-warehouses-dropdown" class="multi-dropdown-menu hidden">
+                  <input id="calc-warehouses-search" type="text" placeholder="Поиск склада...">
+                  <div class="multi-dropdown-actions">
+                    <button type="button" id="calc-warehouses-select-all-btn" class="ghost">Выбрать все</button>
+                    <button type="button" id="calc-warehouses-reset-btn" class="ghost">Сбросить</button>
+                  </div>
+                  <div id="calc-warehouses-checklist" class="multi-checklist"></div>
+                </div>
+              </div>
+            </label>
+            <div class="field" style="grid-column: span 2;">
+              <span>Доли продаж по складам, % (можно изменить вручную)</span>
+              <label class="inline-toggle"><input id="auto-warehouse-share" type="checkbox"> Авторасчет долей по заказам</label>
+              <div id="warehouse-share-grid" class="warehouse-share-grid"></div>
+            </div>
+          </div>
+          <select id="warehouse-filter" class="hidden"></select>
+          <input id="target-days" type="hidden" value="30">
+          <input id="optimal-days" type="hidden" value="30">
+
+          <div class="action-row">
+            <button id="calculate-shipment-btn" class="success">Рассчитать поставку</button>
+            <button id="report-view-toggle-btn" class="ghost">Details by warehouse: OFF</button>
+            <button id="download-shipment-btn" class="secondary" style="display:none;">Скачать расчет</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="tabs">
+            <button class="tab active" data-tab="shipment">Поставка</button>
+            <button class="tab" data-tab="report">Отчет по остаткам</button>
+            <button class="tab" data-tab="abc">ABC-анализ</button>
+            <button class="tab" data-tab="redistribution">Перераспределение</button>
+          </div>
+          <div id="shipment-tab" class="tab-content active"><div id="shipment-table"></div></div>
+          <div id="report-tab" class="tab-content"><div id="report-table"></div></div>
+          <div id="abc-tab" class="tab-content"><div id="abc-table"></div></div>
+          <div id="redistribution-tab" class="tab-content"><div id="redistribution-table"></div></div>
+        </div>
+
+      </div>
+
+      <aside class="side-col">
+        <div class="panel sticky">
+          <h3>Сводка поставки</h3>
+          <div class="side-metrics">
+            <div><span>Итого к отгрузке:</span><b id="sum-units">0</b></div>
+            <div><span>Итого коробов:</span><b id="sum-boxes">0</b></div>
+            <div><span>Ближайшая поставка:</span><b id="sum-date">-</b></div>
+            <div><span>Экономия хранения:</span><b id="sum-saving">0 дн</b></div>
+          </div>
+          <div class="donut-wrap">
+            <div id="donut" class="donut" style="--p:0;">
+              <div class="donut-inner">
+                <b id="donut-value">0</b>
+                <span>к отгрузке</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Импорт / Экспорт</h3>
+          <div class="side-actions">
+            <label class="upload-side"><input id="import-csv-input" type="file" accept=".csv"><span>Импорт CSV</span></label>
+            <button id="export-csv-btn" class="secondary">Экспорт CSV</button>
+            <button id="export-xlsx-btn" class="primary">Экспорт XLSX</button>
+          </div>
+          <p class="hint">Поддержка CSV для ручного ввода позиций, XLSX для отчетов WB.</p>
+        </div>
+
+      </aside>
+    </section>
+    </section>
+
+    <div id="settings-panel" class="settings-panel hidden">
+        <div class="panel settings-card">
+          <div class="panel-head">
+            <h3>Настройки API</h3>
+            <button id="close-settings-btn" class="ghost">Закрыть</button>
+          </div>
+        <div class="tabs">
+          <button class="tab active" data-settings-tab="api">API</button>
+          <button class="tab" data-settings-tab="markers">Маркеры</button>
+          <button class="tab" data-settings-tab="filters-plan">Фильтры и план</button>
+        </div>
+        <div id="settings-api-tab" class="settings-tab active">
+        <p class="hint">Токен хранится локально для текущего пользователя. Используются только GET-запросы.</p>
+        <div class="field" id="wb-token-field">
+          <span>API токен</span>
+          <input id="api-token-input" type="password" placeholder="Вставьте API токен Wildberries">
+        </div>
+        <div class="field hidden" id="ozon-client-id-field">
+          <span>Ozon Client ID</span>
+          <input id="ozon-client-id-input" type="text" placeholder="Введите Client ID">
+        </div>
+        <div class="field hidden" id="ozon-api-key-field">
+          <span>Ozon API Key</span>
+          <input id="ozon-api-key-input" type="password" placeholder="Введите API Key">
+        </div>
+        <div class="field">
+          <span>Дата от</span>
+          <input id="api-date-from" type="date">
+        </div>
+        <div class="side-actions">
+          <button id="api-test-btn" class="blue">Проверить API</button>
+          <button id="api-load-stocks-btn" class="primary">Загрузить остатки</button>
+          <label class="upload-side"><input id="ozon-stocks-xlsx-input" type="file" accept=".xlsx,.xls"><span>Остатки Ozon XLSX</span></label>
+          <label class="upload-side"><input id="ozon-orders-csv-input" type="file" accept=".csv"><span>Заказы Ozon CSV</span></label>
+          <button id="clear-ozon-csv-btn" class="ghost" type="button" style="display:none;">✕ Сбросить CSV заказы</button>
+          <button class="success" id="recalc-all-btn">Пересчитать все</button>
+          <button class="ghost" id="migrate-profile-btn">Перенести профиль в сервер</button>
+          <button class="primary" id="sync-push-btn" type="button">Синхронизировать</button>
+          <span id="sync-status" class="hint" style="display:none;"></span>
+        </div>
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+            <h4 style="margin:0;font-size:13px;">Резервные копии</h4>
+            <button class="ghost" id="backup-create-btn" type="button" style="font-size:12px;min-height:32px;padding:4px 10px;">Создать резервную копию</button>
+          </div>
+          <div id="backups-list"><span class="hint">Загрузка...</span></div>
+        </div>
+        <div id="api-test-result" class="api-result empty">Результаты проверки появятся здесь.</div>
+        </div>
+        <div id="settings-markers-tab" class="settings-tab">
+          <p class="hint">Настройка порогов покрытия для маркеров.</p>
+          <div class="controls-grid">
+            <label class="field">
+              <span>Порог "мало товара", дней</span>
+              <input id="settings-low-stock-days" type="number" min="1" value="20">
+            </label>
+            <label class="field">
+              <span>Порог "излишек", дней</span>
+              <input id="settings-overstock-days" type="number" min="1" value="45">
+            </label>
+          </div>
+        </div>
+        <div id="settings-filters-plan-tab" class="settings-tab">
+          <p class="hint">Список артикулов для полного исключения из системы или режим работы только по этому списку.</p>
+          <div class="field">
+            <span>Артикулы (по одному в строке или через запятую)</span>
+            <textarea id="settings-sku-list" rows="8" placeholder="10986&#10;ABC-123&#10;..."></textarea>
+          </div>
+          <div class="toggles-row">
+            <label><input id="settings-use-only-sku-list" type="checkbox"> Работать только с этим списком артикулов</label>
+          </div>
+          <div class="field" style="margin-top: 8px;">
+            <span>План продаж XLSX (2 столбца: артикул, план)</span>
+            <label class="upload-side">
+              <input id="settings-sales-plan-input" type="file" accept=".xlsx,.xls">
+              <span>Загрузить план продаж</span>
+            </label>
+          </div>
+          <div id="settings-sales-plan-status" class="hint">План продаж не загружен.</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Мобильное меню для iPad и телефонов -->
+  <div id="mobile-menu" class="mobile-menu">
+    <div class="mobile-menu-header">
+      <button id="mobile-close-menu" class="ghost close-menu-btn">✕ Закрыть</button>
+    </div>
+    <nav class="mobile-nav">
+      <a href="#" id="mobile-dashboard-btn">📊 Дашборд</a>
+      <a href="#" id="mobile-calc-btn">📦 Расчет поставки</a>
+      <div class="mobile-analytics-group">
+        <button id="mobile-analytics-stock-btn" class="ghost">📈 Аналитика остатков</button>
+        <button id="mobile-analytics-warehouse-btn" class="ghost">🏭 Аналитика складов</button>
+        <button id="mobile-analytics-turnover-btn" class="ghost">🔄 Оборачиваемость</button>
+      </div>
+    </nav>
+  </div>
+  <div id="mobile-menu-overlay" class="mobile-menu-overlay"></div>
+
+  <script src="js/app.js"></script>
+  </div>
+</body>
+</html>
