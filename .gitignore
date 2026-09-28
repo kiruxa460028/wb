@@ -1,0 +1,60 @@
+# ─── Данные приложения (НИКОГДА не коммитим: хэши паролей, API-токены) ───
+data/*
+!data/.gitkeep
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+
+# ─── Локальные архивы и бэкапы хостинга ───
+archive/
+*.zip
+*.tar
+*.tar.gz
+*.bak
+
+# ─── Секреты ───
+.env
+.env.*
+!.env.example
+*.token
+secrets.json
+
+# ─── Python ───
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# ─── Сборка EXE (PyInstaller) ───
+build/
+dist/
+*.spec
+
+# ─── Node ───
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ─── Редакторы и ОС ───
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── Логи и временные файлы ───
+# (только в корне — deploy/tmp/restart.txt нужен для перезапуска хостинга)
+*.log
+logs/
+/tmp/

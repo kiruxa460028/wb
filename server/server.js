@@ -5,11 +5,16 @@ const crypto = require("crypto");
 const { URL } = require("url");
 const { DatabaseSync } = require("node:sqlite");
 
-const HOST = "127.0.0.1";
-const PORT = 5500;
+// Хост/порт можно переопределить через переменные окружения:
+//   HOST=0.0.0.0 PORT=8080 node server/server.js
+const HOST = process.env.HOST || "127.0.0.1";
+const PORT = Number(process.env.PORT) || 5500;
 const BUILD_TAG = "2026-05-04-ozon-reports-only-v1";
-const ROOT = __dirname;
-const DATA_DIR = path.join(ROOT, "data");
+
+// Пути проекта (сервер лежит в <корень>/server, статика — в <корень>/web).
+const PROJECT_ROOT = path.resolve(__dirname, "..");
+const WEB_DIR = path.join(PROJECT_ROOT, "web");
+const DATA_DIR = process.env.WBSP_DATA_DIR || path.join(PROJECT_ROOT, "data");
 const DB_PATH = path.join(DATA_DIR, "app.db");
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -2346,8 +2351,8 @@ function readJson(req) {
 function serveStatic(req, res, pathname) {
   let rel = pathname === "/" ? "/index.html" : pathname;
   rel = path.normalize(rel).replace(/^(\.\.[/\\])+/, "");
-  const filePath = path.join(ROOT, rel);
-  if (!filePath.startsWith(ROOT)) {
+  const filePath = path.join(WEB_DIR, rel);
+  if (!filePath.startsWith(WEB_DIR)) {
     res.writeHead(403);
     res.end("Forbidden");
     return;

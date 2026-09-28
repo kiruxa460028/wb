@@ -13,12 +13,30 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 
+# ── Пути проекта ────────────────────────────────────────────────────────────
+# Обычный запуск:  server/server.py  ->  корень проекта на уровень выше.
+# PyInstaller EXE: файлы распакованы в sys._MEIPASS, статика лежит в web/.
 BASE_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
-APP_DIR = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else BASE_DIR
-DATA_DIR = os.path.join(APP_DIR, "data")
-ROOT_DB_PATH = os.path.join(APP_DIR, "app.db")
+
+if getattr(sys, "frozen", False):
+    PROJECT_ROOT = BASE_DIR                        # распакованный бандл
+    APP_DIR = os.path.dirname(sys.executable)      # папка рядом с .exe (туда пишем данные)
+else:
+    PROJECT_ROOT = os.path.dirname(BASE_DIR)       # <корень>/server -> <корень>
+    APP_DIR = PROJECT_ROOT
+
+WEB_DIR = os.path.join(PROJECT_ROOT, "web")        # index.html, css/, js/
+DATA_DIR = os.path.join(APP_DIR, "data")           # app.db и прочие локальные данные
+
+LEGACY_DB_PATH = os.path.join(APP_DIR, "app.db")   # старое расположение БД (до реорганизации)
 DATA_DB_PATH = os.path.join(DATA_DIR, "app.db")
-DB_PATH = os.path.abspath(os.environ.get("WBSP_DB_PATH") or (ROOT_DB_PATH if os.path.exists(ROOT_DB_PATH) else DATA_DB_PATH))
+DB_PATH = os.path.abspath(
+    os.environ.get("WBSP_DB_PATH")
+    or (LEGACY_DB_PATH if os.path.exists(LEGACY_DB_PATH) else DATA_DB_PATH)
+)
+
+HOST = os.environ.get("HOST", "127.0.0.1")
+PORT = int(os.environ.get("PORT", "5500"))
 
 
 def ensure_db():
@@ -103,7 +121,7 @@ def wb_proxy_get(api_url: str, token: str):
 
 class AppHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, directory=BASE_DIR, **kwargs)
+        super().__init__(*args, directory=WEB_DIR, **kwargs)
 
     def _send_cors_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -246,10 +264,11 @@ class AppHandler(SimpleHTTPRequestHandler):
 
 def run():
     ensure_db()
-    port = 5500
-    httpd = ThreadingHTTPServer(("127.0.0.1", port), AppHandler)
-    url = f"http://127.0.0.1:{port}"
+    httpd = ThreadingHTTPServer((HOST, PORT), AppHandler)
+    url = f"http://{'127.0.0.1' if HOST in ('0.0.0.0', '') else HOST}:{PORT}"
     print(f"WB server started: {url}")
+    print(f"  статика: {WEB_DIR}")
+    print(f"  база:    {DB_PATH}")
     if os.environ.get("WBSP_NO_BROWSER") != "1":
         threading.Timer(0.5, lambda: webbrowser.open(url)).start()
     httpd.serve_forever()
