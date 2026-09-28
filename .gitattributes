@@ -1,0 +1,16 @@
+# Переводы строк нормализуются к LF в репозитории,
+# а в рабочей копии выдаются как нужно конкретному формату.
+* text=auto eol=lf
+
+# Windows-скрипты обязаны иметь CRLF, иначе cmd.exe ломается на метках и goto
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Бинарные файлы не трогать
+*.db     binary
+*.xlsx   binary
+*.zip    binary
+*.png    binary
+*.jpg    binary
+*.ico    binary
